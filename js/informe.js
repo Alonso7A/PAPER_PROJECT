@@ -87,6 +87,14 @@ export function generarMarkdown(s, d, mensajes, secciones) {
     .flatMap((sec) => mensajes[sec.id].filter((m) => m.n === 'aviso').map((m) => `- **${sec.num} · ${sec.titulo}:** ${seguro(m.t)}`));
 
   const kw = parsearKeywords(s.keywords.texto);
+  const autores = s.autores?.lista ?? [];
+  const bloqueAutores = autores.length
+    ? tabla(['Autor', 'Afiliación', 'Correo'], autores.map((a) => [
+      `${a.nombre ?? ''}${a.correspondencia ? ' (correspondencia)' : ''}`,
+      [a.departamento, a.universidad, [a.ciudad, a.pais].filter(Boolean).join(', ')].filter(Boolean).join(' — '),
+      a.correo,
+    ]))
+    : PENDIENTE;
 
   return `# ${txt(s.titulo.texto)}
 
@@ -97,7 +105,12 @@ export function generarMarkdown(s, d, mensajes, secciones) {
 | Destino | ${destinoTxt} |
 | Nivel académico | ${nivelAcadTxt} |
 | Estilo de citación | ${p.citacion ?? '—'} |
-| Generado | ${fecha} |
+| Idioma | ${({ es: 'Español', en: 'Inglés' })[p.idioma] ?? '—'} |
+${s.autores?.grupo ? `| Grupo | ${seguro(s.autores.grupo)} |\n` : ''}| Generado | ${fecha} |
+
+**Autores**
+
+${bloqueAutores}
 
 **Palabras clave:** ${kw.map((k) => seguro(k.es)).join('; ') || PENDIENTE}
 
@@ -229,7 +242,7 @@ ${referencias(papers, estilo)}
 }
 
 // Muestra el informe en pantalla con opciones de descarga e impresión.
-export async function abrirInforme(md, nombreBase, alCerrar) {
+export async function abrirInforme(md, nombreBase, alCerrar, crearPdf) {
   const { mdAHtml } = await import('./guia.js');
   const vista = document.getElementById('vista-informe');
   document.getElementById('informe-doc').innerHTML = mdAHtml(md);
@@ -238,7 +251,21 @@ export async function abrirInforme(md, nombreBase, alCerrar) {
 
   const { descargar } = await import('./util.js');
   document.getElementById('inf-md').onclick = () => descargar(`${nombreBase}.md`, md, 'text/markdown');
-  document.getElementById('inf-pdf').onclick = () => window.print();
+  const btnPdf = document.getElementById('inf-pdf');
+  const estadoPdf = document.getElementById('inf-estado');
+  btnPdf.onclick = async () => {
+    btnPdf.disabled = true;
+    estadoPdf.textContent = 'Generando PDF…';
+    try {
+      const bytes = await crearPdf();
+      descargar(`${nombreBase}.pdf`, bytes, 'application/pdf');
+      estadoPdf.textContent = 'PDF descargado (con el proyecto adjunto).';
+    } catch (err) {
+      estadoPdf.textContent = `No se pudo generar el PDF: ${err.message}`;
+    } finally {
+      btnPdf.disabled = false;
+    }
+  };
   document.getElementById('inf-cerrar').onclick = () => {
     vista.hidden = true;
     document.body.classList.remove('con-informe');

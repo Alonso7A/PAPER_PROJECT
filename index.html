@@ -47,10 +47,13 @@
 
   <div class="vista-informe" id="vista-informe" hidden>
     <div class="informe-barra">
-      <strong>Informe</strong>
       <div>
-        <button type="button" id="inf-md">Descargar .md</button>
-        <button type="button" class="sec" id="inf-pdf">Imprimir / Guardar PDF</button>
+        <strong>Informe</strong>
+        <span class="inf-estado" id="inf-estado" role="status" aria-live="polite"></span>
+      </div>
+      <div>
+        <button type="button" id="inf-pdf">Descargar PDF</button>
+        <button type="button" class="sec" id="inf-md">Descargar .md</button>
         <button type="button" class="sec" id="inf-cerrar">Cerrar</button>
       </div>
     </div>

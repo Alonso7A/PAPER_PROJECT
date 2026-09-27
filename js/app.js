@@ -5,6 +5,7 @@ import { validarTodo, estadoDe, sugerirTitulo, construirMatriz, COLUMNAS_MATRIZ,
 import { cargarGuia, guiaHtml } from './guia.js';
 import { montarEstadoArte } from './estado-arte.js';
 import { generarMarkdown, abrirInforme } from './informe.js';
+import { generarPdf } from './informe-pdf.js';
 
 const CLAVE_ALMACEN = 'creacion-paper:v1';
 const CLAVE_SECCION = 'creacion-paper:seccion';
@@ -43,6 +44,7 @@ function definirSecciones(d) {
           { p: 'problema.destino', t: 'select', l: 'D1. Producto', o: { revista: 'Artículo de revista', congreso: 'Artículo de congreso', tesis: 'Tesis' } },
           { p: 'problema.nivelAcad', t: 'select', l: 'D2. Nivel académico', o: { bachiller: 'Bachiller', titulo: 'Título profesional', maestria: 'Maestría', doctorado: 'Doctorado' } },
           { p: 'problema.citacion', t: 'select', l: 'D3. Estilo de citación', o: { IEEE: 'IEEE', APA: 'APA', otro: 'Otro (se usará formato IEEE)' } },
+          { p: 'problema.idioma', t: 'select', l: 'Idioma del manuscrito', o: { es: 'Español (con resumen también en inglés)', en: 'Inglés' } },
         ] },
       ],
     },
@@ -171,7 +173,19 @@ function definirSecciones(d) {
       ],
     },
     {
-      id: 'informe', num: 9, titulo: 'Informe', esInforme: true,
+      id: 'autores', num: 9, titulo: 'Autores',
+      intro: 'Datos de cada miembro tal como aparecerán bajo el título: nombre, departamento, universidad, ciudad y país, y correo. El orden importa: primero quien ejecutó el trabajo, al final el asesor.',
+      guia: { fase: 11, h3: ['Secciones administrativas'] },
+      grupos: [
+        { custom: 'autores' },
+        { titulo: 'Datos complementarios', campos: [
+          { p: 'autores.grupo', t: 'text', l: 'Grupo o proyecto de investigación (opcional)', ph: 'Ej.: GMIDEI' },
+          { p: 'autores.agradecimientos', t: 'textarea', rows: 2, l: 'Agradecimientos y financiamiento (opcional)', ph: 'Ej.: Este trabajo fue financiado por … Los autores agradecen a …' },
+        ] },
+      ],
+    },
+    {
+      id: 'informe', num: 10, titulo: 'Informe', esInforme: true,
       intro: 'Cuando ningún recuadro esté en rojo, genera el protocolo y el esqueleto IMRaD del paper.',
       guia: { titulos: ['Andamiaje interno vs. manuscrito publicado', 'Checklist final'] },
       grupos: [{ custom: 'informe' }],
@@ -184,13 +198,23 @@ function definirSecciones(d) {
 const estadoInicial = () => ({
   version: 1,
   problema: {}, variables: {}, titulo: {}, keywords: {}, tipificacion: {},
-  estadoArte: { papers: [] }, cadena: {}, diseno: {},
+  estadoArte: { papers: [] }, cadena: {}, diseno: {}, autores: { lista: [] },
 });
+
+// Completa las partes que falten (proyectos guardados con versiones anteriores de la página)
+// y descarta el bloque _export, que solo existe en los archivos exportados.
+function normalizar(obj) {
+  const { _export, ...resto } = obj;
+  const e = { ...estadoInicial(), ...resto };
+  e.estadoArte = { papers: [], ...e.estadoArte };
+  e.autores = { lista: [], ...e.autores };
+  return e;
+}
 
 function cargarEstado() {
   try {
     const guardado = JSON.parse(localStorage.getItem(CLAVE_ALMACEN));
-    if (guardado?.version === 1) return { ...estadoInicial(), ...guardado };
+    if (guardado?.version === 1) return normalizar(guardado);
   } catch { /* almacenamiento no disponible o dañado */ }
   return estadoInicial();
 }
@@ -224,6 +248,7 @@ function seccionVacia(sec) {
   if (sec.id === 'matriz') return vacio(estado.cadena.preguntasEsp);
   const sinCampos = camposDe(sec).every((c) => vacio(obtener(estado, c.p)) || obtener(estado, c.p) === false);
   if (sec.id === 'estadoArte') return sinCampos && !estado.estadoArte.papers.length;
+  if (sec.id === 'autores') return sinCampos && !estado.autores.lista.length;
   return sinCampos;
 }
 
@@ -405,7 +430,90 @@ function montarCustom(tipo, el) {
     pintarMatriz(el);
   } else if (tipo === 'informe') {
     pintarInformeCustom();
+  } else if (tipo === 'autores') {
+    montarAutores(el);
   }
+}
+
+// ── Autores: una tarjeta por miembro, en el orden en que aparecerán en el paper ──
+const CAMPOS_AUTOR = [
+  ['nombre', 'Nombre completo', 'Ej.: Ana Torres Quispe'],
+  ['departamento', 'Departamento o facultad', 'Ej.: Facultad de Ingeniería Mecánica'],
+  ['universidad', 'Universidad o institución', 'Ej.: Universidad Nacional de Ingeniería'],
+  ['ciudad', 'Ciudad', 'Ej.: Lima'],
+  ['pais', 'País', 'Ej.: Perú'],
+  ['correo', 'Correo electrónico', 'Ej.: ana.torres@uni.pe'],
+  ['orcid', 'ORCID (opcional)', '0000-0000-0000-0000'],
+];
+
+function montarAutores(el) {
+  const lista = () => estado.autores.lista;
+  const cambio = () => { guardar(); revalidar(); };
+
+  function pintar() {
+    el.innerHTML = `
+      ${lista().map((a, i) => `
+        <div class="autor" data-i="${i}">
+          <div class="autor-cab">
+            <strong>Autor ${i + 1}${i === 0 ? ' · primer autor' : ''}</strong>
+            <div class="autor-acciones">
+              <button type="button" class="sec" data-accion="subir" ${i === 0 ? 'disabled' : ''} aria-label="Subir autor ${i + 1}">↑</button>
+              <button type="button" class="sec" data-accion="bajar" ${i === lista().length - 1 ? 'disabled' : ''} aria-label="Bajar autor ${i + 1}">↓</button>
+              <button type="button" class="peligro" data-accion="quitar">Quitar</button>
+            </div>
+          </div>
+          <div class="grid-2">
+            ${CAMPOS_AUTOR.map(([k, l, ph]) => `
+              <label class="campo-mini">${l}<input data-ac="${k}" value="${escHtml(a[k])}" placeholder="${escHtml(ph)}"></label>`).join('')}
+          </div>
+          <label class="check"><input type="radio" name="correspondencia" data-ac="correspondencia" ${a.correspondencia ? 'checked' : ''}> Autor de correspondencia</label>
+        </div>`).join('')}
+      <button type="button" id="btn-agregar-autor">+ Agregar autor</button>
+      <p class="ayuda">Vista previa del bloque de autores (así aparecerá bajo el título del paper):</p>
+      <div class="vista-autores">${htmlVista()}</div>`;
+  }
+
+  const htmlVista = () => lista().filter((a) => a.nombre).map((a) => `
+    <div class="bloque-autor">
+      <strong>${escHtml(a.nombre)}${a.correspondencia ? '*' : ''}</strong>
+      <span>${escHtml(a.departamento)}</span>
+      <span>${escHtml(a.universidad)}</span>
+      <span>${escHtml([a.ciudad, a.pais].filter(Boolean).join(', '))}</span>
+      <span>${escHtml(a.correo)}</span>
+    </div>`).join('') || '<p class="ayuda">Aún no hay autores con nombre.</p>';
+
+  el.addEventListener('input', (e) => {
+    const k = e.target.dataset.ac;
+    const i = Number(e.target.closest('.autor')?.dataset.i);
+    if (!k || Number.isNaN(i)) return;
+    if (k === 'correspondencia') lista().forEach((a, j) => { a.correspondencia = j === i; });
+    else lista()[i][k] = e.target.value;
+    cambio();
+    el.querySelector('.vista-autores').innerHTML = htmlVista();
+  });
+  el.addEventListener('change', (e) => {
+    if (e.target.dataset.ac === 'correspondencia') e.target.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  el.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.id === 'btn-agregar-autor') {
+      lista().push({ correspondencia: lista().length === 0 });
+    } else {
+      const i = Number(btn.closest('.autor')?.dataset.i);
+      const l = lista();
+      if (btn.dataset.accion === 'quitar') {
+        if (!confirm(`¿Quitar a ${l[i].nombre || `el autor ${i + 1}`}?`)) return;
+        l.splice(i, 1);
+      } else if (btn.dataset.accion === 'subir') [l[i - 1], l[i]] = [l[i], l[i - 1]];
+      else if (btn.dataset.accion === 'bajar') [l[i + 1], l[i]] = [l[i], l[i + 1]];
+      else return;
+    }
+    cambio();
+    pintar();
+  });
+
+  pintar();
 }
 
 function pintarMatriz(el) {
@@ -434,20 +542,55 @@ function pintarInformeCustom() {
     <div class="acciones-informe">
       <button type="button" id="btn-informe" ${habil ? '' : 'disabled'}>Generar informe</button>
       <p class="ayuda">${habil
-        ? 'Incluye el protocolo completo, el esqueleto IMRaD y las advertencias que decidiste no corregir.'
+        ? 'Muestra el informe y permite descargarlo en PDF. El PDF lleva adjunto el proyecto completo (JSON) para la skill paper_proyectos_GMIDEI.'
         : 'Se habilita cuando ningún recuadro está pendiente ni en rojo.'}</p>
     </div>`;
   el.querySelector('#btn-informe').addEventListener('click', () => {
     const md = generarMarkdown(estado, datos, mensajes, secciones);
-    abrirInforme(md, 'informe-paper', () => document.getElementById('btn-informe')?.focus());
+    const fecha = new Date().toISOString().slice(0, 10);
+    abrirInforme(md, `informe-paper-${fecha}`, () => document.getElementById('btn-informe')?.focus(),
+      () => generarPdf(estado, datos, bloqueExport()));
   });
 }
 
 // ───────────────────────────── Acciones globales ─────────────────────────────
 
+// El bloque _export resume la validación y traduce los códigos a texto legible.
+// Lo usa la skill paper_proyectos_GMIDEI; la página lo ignora al importar.
+function bloqueExport() {
+  const crit = datos.combinaciones.criterios;
+  const t = estado.tipificacion;
+  const recuadros = Object.fromEntries(secciones.filter((s) => !s.esInforme).map((s) => {
+    const msgs = mensajes[s.id] ?? [];
+    return [s.id, {
+      numero: s.num,
+      titulo: s.titulo,
+      estado: estadoSeccion(s),
+      errores: msgs.filter((m) => m.n === 'error').map((m) => m.t),
+      advertencias: msgs.filter((m) => m.n === 'aviso').map((m) => m.t),
+    }];
+  }));
+  const verbo = datos.verbos.verbos[estado.titulo.verbo];
+  return {
+    formato: 'creacion-paper',
+    version: 1,
+    exportado: new Date().toISOString(),
+    completo: informeHabilitado(),
+    recuadros,
+    etiquetas: {
+      tipificacion: Object.fromEntries(datos.combinaciones.orden.map((k) => [k, t[k] ? crit[k].opciones[t[k]] : null])),
+      verboRector: verbo ? { verbo: estado.titulo.verbo, niveles: verbo.niveles, nominal: verbo.nominal } : null,
+      arreglo: ARREGLOS[estado.diseno.arreglo] ?? null,
+      vacio: estado.estadoArte.vacio ?? null,
+    },
+    matrizConsistencia: construirMatriz(estado, datos),
+  };
+}
+
 function exportar() {
   const fecha = new Date().toISOString().slice(0, 10);
-  descargar(`proyecto-paper-${fecha}.json`, JSON.stringify(estado, null, 2), 'application/json');
+  const salida = { ...estado, _export: bloqueExport() };
+  descargar(`proyecto-paper-${fecha}.json`, JSON.stringify(salida, null, 2), 'application/json');
 }
 
 async function importar(archivo) {
@@ -455,8 +598,7 @@ async function importar(archivo) {
     const nuevo = JSON.parse(await archivo.text());
     if (nuevo?.version !== 1) throw new Error('no es un proyecto de esta página');
     if (!confirm('Esto reemplazará el proyecto actual. ¿Continuar?')) return;
-    estado = { ...estadoInicial(), ...nuevo };
-    estado.estadoArte.papers ??= [];
+    estado = normalizar(nuevo);
     guardar();
     revalidar();
     mostrarSeccion(actual);

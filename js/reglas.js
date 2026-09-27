@@ -56,6 +56,7 @@ function vProblema(s) {
   if (vacio(p.destino)) m.push(E('Elige el destino: define la forma del título y el número de referencias.', 'problema.destino'));
   if (vacio(p.nivelAcad)) m.push(E('Elige el nivel académico (filtro 9 de acotación).', 'problema.nivelAcad'));
   if (vacio(p.citacion)) m.push(E('Elige el estilo de citación.', 'problema.citacion'));
+  if (vacio(p.idioma)) m.push(E('Elige el idioma del manuscrito.', 'problema.idioma'));
   return m;
 }
 
@@ -527,6 +528,33 @@ function vDiseno(s) {
   return m;
 }
 
+// ─────────────────────────────────── 9 · Autores ───────────────────────────────────
+const RE_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const RE_ORCID = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/;
+const CAMPOS_AUTOR_OBLIGATORIOS = [
+  ['nombre', 'nombre'], ['departamento', 'departamento'], ['universidad', 'universidad'],
+  ['ciudad', 'ciudad'], ['pais', 'país'], ['correo', 'correo'],
+];
+
+function vAutores(s) {
+  const lista = s.autores?.lista ?? [], m = [];
+  if (!lista.length) return [E('Agrega al menos un autor: sus datos van bajo el título del paper.')];
+
+  lista.forEach((a, i) => {
+    const etq = `Autor ${i + 1}${a.nombre ? ` (${a.nombre})` : ''}`;
+    const faltan = CAMPOS_AUTOR_OBLIGATORIOS.filter(([k]) => vacio(a[k])).map(([, l]) => l);
+    if (faltan.length) m.push(E(`${etq}: falta ${faltan.join(', ')}.`));
+    if (!vacio(a.correo) && !RE_CORREO.test(a.correo.trim())) m.push(E(`${etq}: el correo no tiene un formato válido.`));
+    if (!vacio(a.orcid) && !RE_ORCID.test(a.orcid.trim())) m.push(A(`${etq}: el ORCID debe tener el formato 0000-0000-0000-0000.`));
+  });
+
+  const corresp = lista.filter((a) => a.correspondencia).length;
+  if (corresp === 0) m.push(A('Marca un autor de correspondencia; si no, se asumirá el primero.'));
+  if (lista.length > 6) m.push(A(`${lista.length} autores: la plantilla IEEE de conferencia se ve bien hasta 6; revisa la lista de autoría.`));
+  if (!m.some((x) => x.n === 'error')) m.push(OK(`${lista.length} autor(es) con datos completos.`));
+  return m;
+}
+
 // ────────────────────────────────── Conjunto ──────────────────────────────────
 const VALIDADORES = {
   problema: vProblema,
@@ -538,6 +566,7 @@ const VALIDADORES = {
   cadena: vCadena,
   matriz: vMatriz,
   diseno: vDiseno,
+  autores: vAutores,
 };
 
 export function validarTodo(s, d) {

@@ -17,7 +17,8 @@ Guía interactiva para construir un paper científico de ingeniería desde cero.
 | 6 | Cadena lógica | Regla 1:1 preguntas-objetivos, verbos prohibidos, hipótesis contrastable |
 | 7 | Matriz de consistencia | Se genera sola; marca las filas que no cierran |
 | 8 | Diseño experimental | Línea base, réplicas, aleatorización, procedimiento, análisis |
-| 9 | Informe | Descarga en Markdown o PDF |
+| 9 | Autores | Nombre, departamento, universidad, ciudad, país y correo de cada miembro; autor de correspondencia |
+| 10 | Informe | Descarga en Markdown o PDF |
 
 ## Estructura
 
@@ -29,13 +30,15 @@ Guía interactiva para construir un paper científico de ingeniería desde cero.
 │   ├── reglas.js         Validaciones de cada recuadro
 │   ├── guia.js           Lee docs/paper-cientifico-ingenieria.md y muestra cada fase
 │   ├── estado-arte.js    OpenAlex, Crossref, DataCite, PDF.js, .bib/.ris y matriz
-│   ├── informe.js        Genera el informe en Markdown
+│   ├── informe.js        Genera el informe en Markdown (vista previa)
+│   ├── informe-pdf.js    Genera el PDF del informe con el proyecto adjunto (pdfmake + pdf-lib)
 │   └── util.js           Funciones de texto compartidas
 ├── data/
 │   ├── verbos.json       Verbo rector → nivel → forma nominal
 │   └── combinaciones.json  Seis criterios y las 30 combinaciones válidas
 └── docs/
-    └── paper-cientifico-ingenieria.md   Fuente de la guía
+    ├── paper-cientifico-ingenieria.md   Fuente de la guía
+    └── esquema-json.md                  Formato del proyecto exportado
 ```
 
 ## Cómo guía el .md a la página
@@ -43,13 +46,24 @@ Guía interactiva para construir un paper científico de ingeniería desde cero.
 - **Texto de la guía:** `guia.js` lee el .md y reparte cada sección `## FASE N — …` en su recuadro. Si editas el texto, la página cambia sola. **No renombres esos encabezados.**
 - **Reglas:** están en `js/reglas.js` y `data/*.json`. Si cambias una regla en el .md, cámbiala también allí.
 
+## Del informe al paper en LaTeX
+
+- **Generar informe → Descargar PDF** produce `informe-paper-AAAA-MM-DD.pdf`: el protocolo completo, las matrices, el estado de validación y un **anexo con una ficha por referencia** (hallazgos cuantitativos con su página, extracto de conclusiones y resumen). El PDF lleva **adjunto** `proyecto-paper.json` con todos los datos.
+- **Exportar proyecto (JSON)** produce el mismo contenido en `proyecto-paper-AAAA-MM-DD.json` (formato en `docs/esquema-json.md`).
+
+Cualquiera de los dos lo consume la skill de Claude Code **`paper_proyectos_GMIDEI`**. Redacta el artículo completo en LaTeX (plantilla IEEE de conferencia, bloques de autores, cifras con `siunitx`), cita los resultados de otros trabajos con su página (`[3, p. 5]`), calcula la estadística si se le dan los datos experimentales y compila el PDF. Basta con decirle a Claude: *“genera el paper desde informe-paper-….pdf”*.
+
+### Hallazgos para citar con precisión
+
+Al subir el PDF de un paper (o adjuntarlo a una referencia ya agregada), la página extrae las frases con cifras (%, mm, MPa, valores p, R²…) y el extracto de conclusiones, con su número de página. En la tarjeta de cada referencia puedes desmarcar las frases que no sean resultados: la skill solo cita las marcadas.
+
 ## Probar en local
 
 La página debe servirse por HTTP (con doble clic el navegador bloquea la lectura del .md y los JSON):
 
 ```bash
-python3 -m http.server 8000
-# abrir http://localhost:8000
+python3 -m http.server 8080
+# abrir http://localhost:8080
 ```
 
 ## Privacidad

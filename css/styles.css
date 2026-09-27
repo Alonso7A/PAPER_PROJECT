@@ -373,6 +373,29 @@ input[type="file"] { font-size: 0.85rem; width: 100%; min-width: 0; overflow: hi
 .editar-biblio summary { cursor: pointer; color: var(--primario); margin-bottom: 8px; }
 .paper-acciones { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
 
+/* ───────────── Autores ───────────── */
+
+.autor { border: 1px solid var(--borde); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; background: var(--superficie-2); }
+.autor-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.autor-acciones { display: flex; gap: 6px; }
+.autor-acciones button { padding: 4px 10px; }
+.autor .check { margin-top: 10px; }
+#btn-agregar-autor { margin: 4px 0 16px; }
+.vista-autores {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px 36px;
+  padding: 18px 12px;
+  border: 1px dashed var(--borde);
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+  font-family: "Times New Roman", Times, serif;
+}
+.bloque-autor { display: flex; flex-direction: column; align-items: center; text-align: center; font-size: 0.9rem; max-width: 220px; }
+.bloque-autor strong { font-weight: 400; font-size: 1rem; }
+
 /* ───────────── Matriz de consistencia ───────────── */
 
 .tabla-scroll { overflow-x: auto; }
@@ -482,3 +505,14 @@ body.con-informe { overflow: hidden; }
   .informe-doc table { break-inside: auto; }
   .informe-doc tr { break-inside: avoid; }
 }
+
+/* ───────────── Hallazgos cuantitativos de cada paper ───────────── */
+
+.hallazgos { margin-top: 10px; padding: 10px; border-radius: 8px; background: var(--ok-suave); }
+.hallazgos .etq-lim { display: block; margin-bottom: 4px; }
+.hallazgos ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.hallazgos .check { font-size: 0.85rem; }
+.hallazgos em, .chip em { color: var(--texto-suave); font-style: normal; font-size: 0.8rem; }
+.paper-acciones label.btn { font-size: 0.92rem; }
+
+.inf-estado { margin-left: 10px; font-size: 0.85rem; color: var(--texto-suave); }

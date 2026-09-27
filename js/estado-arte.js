@@ -29,37 +29,110 @@ function extraerResumen(texto) {
 
 const RE_LIMITACION = /limitation|limitaci|future (?:work|research|studies)|trabajos? futuros?|further (?:research|work|studies|investigation)|should be (?:investigated|studied|explored)|not (?:considered|addressed|investigated)|no (?:se )?(?:consider|abord|estudi)|beyond the scope|fuera del alcance|drawback|shortcoming/i;
 
-function extraerLimitaciones(texto) {
-  const oraciones = texto.replace(/\s+/g, ' ').split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑ])/);
-  const out = [];
-  for (const o of oraciones) {
-    const t = o.trim();
-    if (t.length > 40 && t.length < 600 && RE_LIMITACION.test(t) && !out.includes(t)) {
-      out.push(t);
-      if (out.length >= 6) break;
-    }
-  }
-  return out;
+// Cifra con unidad, porcentaje, valor p, R² o ±: lo que convierte una frase en un hallazgo citable.
+const RE_CIFRA = /\d+(?:[.,]\d+)?\s?(?:%|‰|mm\b|µm|μm|nm\b|cm\b|m\/s|mm\/s|mm\/min|mpa\b|gpa\b|kpa\b|kn\b|n\b|n·m|°\s?c|º\s?c|hz\b|khz\b|rpm\b|kw\b|w\b|ma\b|kg\b|g\b|j\b|db\b|min\b|times\b|veces\b|fold\b)|\bp\s?[<=>≤]\s?0?[.,]\d+|\br\s?(?:²|2|\^2)\s?=|±/i;
+const RE_CAMBIO = /increas|decreas|reduc|improv|higher|lower|greater|maxim|minim|optim|significan|achiev|obtain|reach|resulted|showed|aument|disminu|mejor|mayor|menor|máxim|mínim|óptim|significativ|alcanz|obtuv|logr|redujo|increment/i;
+const RE_REFERENCIA = /et al\.,|\(\d{4}\)\s*[.,]|vol\.\s*\d|pp\.\s*\d|doi:|https?:\/\//i;
+
+const unir = (t) => t.replace(/-\n(?=[a-záéíóúñ])/g, '').replace(/[ \t]+/g, ' ');
+
+function oraciones(texto, pagina) {
+  return texto.replace(/\s+/g, ' ')
+    .split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑ(])/)
+    // Quita encabezados de sección que quedan pegados al inicio ("3. Results The deviation…").
+    .map((t) => ({ texto: t.trim().replace(/^(?:\d+(?:\.\d+)*\.?\s+)?(?:results?(?: and discussion)?|discussion|conclusions?|resultados(?: y discusi[oó]n)?|discusi[oó]n|conclusiones)\s+(?=[A-ZÁÉÍÓÚÑ])/i, ''), pagina }))
+    .filter((o) => o.texto);
 }
 
-// paginas: texto de cada página → { sinTexto, doi, resumen, limitaciones[] }
+// Decimal que no sea número de sección, ecuación, figura o tabla ("section 3.2", "3.2.3").
+function tieneDecimal(t) {
+  for (const m of t.matchAll(/(?<![\d.])\d+[.,]\d+(?![.\d])/g)) {
+    if (!/(?:section|secci[oó]n|sec\.|eq\.|equation|ecuaci[oó]n|fig\.|figure|table|tabla|cap[ií]tulo|chapter)\s*$/i.test(t.slice(0, m.index))) return true;
+  }
+  return false;
+}
+
+function puntajeHallazgo(t) {
+  if (t.length < 40 || t.length > 450 || RE_REFERENCIA.test(t)) return 0;
+  const cambio = RE_CAMBIO.test(t);
+  let base = 0;
+  if (RE_CIFRA.test(t)) base = 2 + (cambio ? 1 : 0);
+  else if (cambio && tieneDecimal(t)) base = 2; // cifra decimal sin unidad conocida (BLEU, índices…)
+  return base ? base + (/^(?:fig|figure|table|tabla)\b/i.test(t) ? -1 : 0) : 0;
+}
+
+// Frases con resultados cuantitativos: las de mayor puntaje, devueltas en orden de aparición.
+function elegirHallazgos(lista, max = 12) {
+  const vistos = new Set();
+  return lista
+    .map((o, i) => ({ ...o, i, puntaje: puntajeHallazgo(o.texto) }))
+    .filter((o) => o.puntaje >= 2 && !vistos.has(o.texto) && vistos.add(o.texto))
+    .sort((a, b) => b.puntaje - a.puntaje || a.i - b.i)
+    .slice(0, max)
+    .sort((a, b) => a.i - b.i)
+    .map(({ texto, pagina }) => ({ texto, pagina }));
+}
+
+// Para referencias sin PDF (OpenAlex, .bib): hallazgos tomados de su resumen.
+export function hallazgosDeResumen(resumen) {
+  return elegirHallazgos(oraciones(resumen ?? '', null), 5).map((h) => ({ ...h, fuente: 'resumen' }));
+}
+
+// paginas: texto de cada página → DOI, resumen, limitaciones, hallazgos y conclusiones con su página.
 export function analizarTextoPdf(paginas) {
-  const unir = (t) => t.replace(/-\n(?=[a-záéíóúñ])/g, '').replace(/[ \t]+/g, ' ');
-  const todo = unir(paginas.join('\n'));
-  if (todo.replace(/\s/g, '').length < 200) return { sinTexto: true, doi: '', resumen: '', limitaciones: [] };
+  const limpias = paginas.map(unir);
+  const todo = limpias.join('\n');
+  if (todo.replace(/\s/g, '').length < 200) {
+    return { sinTexto: true, doi: '', resumen: '', limitaciones: [], hallazgos: [], conclusiones: null, paginas: paginas.length };
+  }
 
   // El DOI propio está en las primeras páginas; más adelante solo hay DOIs de referencias.
-  const inicio = unir(paginas.slice(0, 2).join('\n'));
-  let cuerpo = todo;
-  const refs = [...todo.matchAll(/\n\s*(?:references|referencias|bibliograf[ií]a|literature cited)\s*\n/gi)];
-  const corte = refs.at(-1)?.index ?? -1;
-  if (corte > todo.length * 0.4) cuerpo = todo.slice(0, corte);
+  const inicio = limpias.slice(0, 2).join('\n');
+
+  // Se descarta desde el último encabezado de referencias situado después del 40 % del texto.
+  const cuerpo = [...limpias];
+  let acumulado = 0;
+  let corte = null;
+  limpias.forEach((pg, i) => {
+    for (const m of pg.matchAll(/\n\s*(?:\d+\.?\s*)?(?:references|referencias|bibliograf[ií]a|literature cited)\s*\n/gi)) {
+      if (acumulado + m.index > todo.length * 0.4) corte = { i, index: m.index };
+    }
+    acumulado += pg.length + 1;
+  });
+  if (corte) {
+    cuerpo[corte.i] = cuerpo[corte.i].slice(0, corte.index);
+    cuerpo.length = corte.i + 1;
+  }
+
+  const frases = cuerpo.flatMap((pg, i) => oraciones(pg, i + 1));
+
+  const limitaciones = [];
+  for (const o of frases) {
+    if (o.texto.length > 40 && o.texto.length < 600 && RE_LIMITACION.test(o.texto) && !limitaciones.some((l) => l.texto === o.texto)) {
+      limitaciones.push(o);
+      if (limitaciones.length >= 6) break;
+    }
+  }
+
+  let conclusiones = null;
+  for (let i = 0; i < cuerpo.length && !conclusiones; i++) {
+    const m = cuerpo[i].match(/(?:^|\n)\s*(?:\d+\.?\s*|[IVX]+\.\s*)?(?:conclusions?|conclusiones|concluding remarks|summary and conclusions)\s*\n/i);
+    if (!m) continue;
+    let texto = cuerpo.slice(i).join('\n').slice(m.index + m[0].length);
+    const fin = texto.search(/\n\s*(?:acknowledg|agradecimiento|funding|financiamiento|author contributions|conflicts? of interest|data availability|declaration)/i);
+    if (fin > 0) texto = texto.slice(0, fin);
+    texto = texto.replace(/\s+/g, ' ').trim();
+    if (texto.length > 80) conclusiones = { texto: texto.length > 2500 ? `${texto.slice(0, 2500)}…` : texto, pagina: i + 1 };
+  }
 
   return {
     sinTexto: false,
     doi: extraerDoi(inicio),
     resumen: extraerResumen(inicio),
-    limitaciones: extraerLimitaciones(cuerpo),
+    limitaciones,
+    hallazgos: elegirHallazgos(frases).map((h) => ({ ...h, fuente: 'pdf' })),
+    conclusiones,
+    paginas: paginas.length,
   };
 }
 
@@ -240,6 +313,9 @@ async function leerPdf(archivo) {
 
 // ─────────────────────────────────── Interfaz ───────────────────────────────────
 
+// Las sugerencias antiguas eran texto; las nuevas traen la página.
+const comoFrase = (s) => (typeof s === 'string' ? { texto: s, pagina: null } : s);
+
 const clave = (p) => (p.doi ? `doi:${p.doi.toLowerCase()}` : `t:${norm(p.titulo).slice(0, 80)}`);
 
 const BADGE_DOI = {
@@ -308,10 +384,11 @@ export function montarEstadoArte(contenedor, ctx) {
       id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
       doi: '', titulo: '', autores: [], anio: '', revista: '', url: '', fuente: 'manual',
       objetivo: '', metodologia: '', resultados: '', limitaciones: '', origenLim: 'declarada', aporte: '',
-      sugerencias: [], resumen: '',
+      sugerencias: [], resumen: '', hallazgos: [], conclusiones: null,
       ...datos,
     };
     nuevo.doi = limpiarDoi(nuevo.doi);
+    if (!nuevo.hallazgos.length && nuevo.resumen) nuevo.hallazgos = hallazgosDeResumen(nuevo.resumen);
     nuevo.doiEstado = nuevo.doi ? 'pendiente' : 'sin_doi';
     if (papers().some((p) => clave(p) === clave(nuevo))) {
       informar(`Ya está en la matriz: ${nuevo.titulo || nuevo.doi}`, 'aviso');
@@ -350,6 +427,35 @@ export function montarEstadoArte(contenedor, ctx) {
     return cola;
   }
 
+  // Lee un PDF y devuelve lo extraído, listo para guardarse en la referencia.
+  async function contenidoPdf(archivo) {
+    const { paginas, metaTitulo } = await leerPdf(archivo);
+    const info = analizarTextoPdf(paginas);
+    return {
+      info,
+      metaTitulo,
+      datos: {
+        archivo: archivo.name, paginasPdf: info.paginas, hallazgos: info.hallazgos,
+        conclusiones: info.conclusiones, sugerencias: info.limitaciones, resumen: info.resumen,
+      },
+    };
+  }
+
+  // Añade el contenido de un PDF a una referencia que ya estaba (p. ej., agregada desde OpenAlex).
+  function incorporarPdf(p, d) {
+    Object.assign(p, {
+      archivo: d.archivo, paginasPdf: d.paginasPdf, hallazgos: d.hallazgos,
+      conclusiones: d.conclusiones, sugerencias: d.sugerencias,
+    });
+    if (!p.resumen && d.resumen) p.resumen = d.resumen;
+    abiertos.add(p.id);
+  }
+
+  function informarPdf(nombre, info) {
+    if (info.sinTexto) informar(`${nombre}: parece escaneado (sin texto). Completa sus datos y su DOI a mano.`, 'aviso');
+    else informar(`${nombre}: ${info.doi ? `DOI ${info.doi}` : 'sin DOI en las primeras páginas'} · ${info.hallazgos.length} hallazgo(s) con cifras · ${info.limitaciones.length} frase(s) sobre limitaciones${info.conclusiones ? ' · conclusiones extraídas' : ''}.`, info.doi ? 'info' : 'aviso');
+  }
+
   // ── Fuentes ──
   $('#ea-buscar').addEventListener('click', async () => {
     const consulta = q.value.trim();
@@ -379,19 +485,17 @@ export function montarEstadoArte(contenedor, ctx) {
     for (const archivo of e.target.files) {
       informar(`Leyendo ${archivo.name}…`);
       try {
-        const { paginas, metaTitulo } = await leerPdf(archivo);
-        const info = analizarTextoPdf(paginas);
-        const p = agregar({
-          fuente: 'pdf',
-          doi: info.doi,
-          titulo: tituloDesdePdf(metaTitulo, archivo.name),
-          resumen: info.resumen,
-          sugerencias: info.limitaciones,
-        });
-        if (!p) continue;
-        if (info.sinTexto) informar(`${archivo.name}: parece escaneado (sin texto). Completa sus datos y su DOI a mano.`, 'aviso');
-        else if (!info.doi) informar(`${archivo.name}: no se encontró el DOI en las primeras páginas. Complétalo en “Editar datos bibliográficos”.`, 'aviso');
-        else informar(`${archivo.name}: DOI ${info.doi} · ${info.limitaciones.length} frase(s) sobre limitaciones encontradas.`);
+        const { info, metaTitulo, datos } = await contenidoPdf(archivo);
+        const existente = info.doi && papers().find((pp) => pp.doi?.toLowerCase() === info.doi.toLowerCase());
+        if (existente) {
+          incorporarPdf(existente, datos);
+          ctx.cambiado();
+          refrescarTarjeta(existente.id);
+          informarPdf(archivo.name, info);
+          continue;
+        }
+        const p = agregar({ fuente: 'pdf', doi: info.doi, titulo: tituloDesdePdf(metaTitulo, archivo.name), ...datos });
+        if (p) informarPdf(archivo.name, info);
       } catch (err) {
         informar(`No se pudo leer ${archivo.name}: ${err.message}`, 'error');
       }
@@ -443,8 +547,19 @@ export function montarEstadoArte(contenedor, ctx) {
       <label class="campo-mini">${etq}
         <textarea data-pc="${campo}" rows="${filas}">${escHtml(p[campo])}</textarea>
       </label>`;
-    const chips = (p.sugerencias ?? []).map((s, k) => `
-      <button type="button" class="chip" data-sugerencia="${k}" title="Añadir a limitaciones">+ ${escHtml(s.length > 140 ? `${s.slice(0, 140)}…` : s)}</button>`).join('');
+    const chips = (p.sugerencias ?? []).map(comoFrase).map((s, k) => `
+      <button type="button" class="chip" data-sugerencia="${k}" title="Añadir a limitaciones">+ ${escHtml(s.texto.length > 140 ? `${s.texto.slice(0, 140)}…` : s.texto)}${s.pagina ? ` <em>(p. ${s.pagina})</em>` : ''}</button>`).join('');
+    const hallazgos = p.hallazgos ?? [];
+    const desdeResumen = hallazgos.length && hallazgos.every((h) => h.fuente === 'resumen');
+    const bloqueHallazgos = hallazgos.length ? `
+          <div class="hallazgos">
+            <span class="etq-lim">Hallazgos cuantitativos (${hallazgos.filter((h) => !h.descartado).length} de ${hallazgos.length})</span>
+            <p class="ayuda">Frases con cifras extraídas ${desdeResumen ? 'del resumen' : 'del PDF, con su página'}. Desmarca las que no sean resultados del trabajo: la skill citará solo las marcadas.</p>
+            <ul>${hallazgos.map((h, k) => `
+              <li><label class="check"><input type="checkbox" data-hallazgo="${k}" ${h.descartado ? '' : 'checked'}>
+                <span>${escHtml(h.texto)}${h.pagina ? ` <em>(p. ${h.pagina})</em>` : ''}</span></label></li>`).join('')}
+            </ul>
+          </div>` : '';
     return `
       <details class="paper" data-id="${p.id}" ${abiertos.has(p.id) ? 'open' : ''}>
         <summary>
@@ -454,18 +569,21 @@ export function montarEstadoArte(contenedor, ctx) {
             <span class="badge ${tipoDoi}" data-badge-doi>${txtDoi}</span>
             <span class="badge ${limOk ? 'ok' : 'error'}" data-badge-lim>${limOk ? 'Limitaciones' : 'Sin limitaciones'}</span>
             <span class="badge neutro">${FUENTE[p.fuente] ?? p.fuente}</span>
+            ${p.archivo ? `<span class="badge ok" title="${escHtml(p.archivo)}">PDF · ${p.paginasPdf ?? '?'} pág.</span>` : ''}
           </span>
         </summary>
         <div class="paper-cuerpo">
           <p class="meta">${escHtml(p.autores.join(', ') || 'Autores sin completar')} · ${escHtml(p.revista || 'Fuente sin completar')} · ${escHtml(p.anio || 's. f.')}
             ${p.doi ? ` · <a href="https://doi.org/${escHtml(p.doi)}" target="_blank" rel="noopener">${escHtml(p.doi)}</a>` : ''}</p>
           ${p.resumen ? `<details class="resumen-paper"><summary>Resumen</summary><p>${escHtml(p.resumen)}</p></details>` : ''}
+          ${p.conclusiones ? `<details class="resumen-paper"><summary>Conclusiones del PDF (p. ${p.conclusiones.pagina})</summary><p>${escHtml(p.conclusiones.texto)}</p></details>` : ''}
           <div class="grid-2">
             ${area('objetivo', 'Objetivo')}
             ${area('metodologia', 'Metodología')}
             ${area('resultados', 'Resultados')}
             ${area('aporte', 'Aporte')}
           </div>
+          ${bloqueHallazgos}
           <div class="limitaciones">
             <div class="fila-lim">
               <span class="etq-lim">Limitaciones</span>
@@ -488,6 +606,7 @@ export function montarEstadoArte(contenedor, ctx) {
             </div>
           </details>
           <div class="paper-acciones">
+            <label class="btn sec">${p.archivo ? 'Reemplazar PDF' : 'Adjuntar PDF'}<input type="file" accept=".pdf,application/pdf" data-adjuntar hidden></label>
             <button type="button" class="sec" data-accion="verificar" ${p.doi ? '' : 'disabled'}>Verificar DOI</button>
             <button type="button" class="peligro" data-accion="eliminar">Eliminar</button>
           </div>
@@ -553,8 +672,35 @@ export function montarEstadoArte(contenedor, ctx) {
     ctx.cambiado();
     pintarResumen();
   });
-  matriz.addEventListener('change', (e) => {
-    if (e.target.matches('select[data-pc]')) e.target.dispatchEvent(new Event('input', { bubbles: true }));
+  matriz.addEventListener('change', async (e) => {
+    if (e.target.matches('select[data-pc]')) {
+      e.target.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
+    const p = paperDe(e.target);
+    if (!p) return;
+    if (e.target.dataset.hallazgo !== undefined) {
+      p.hallazgos[Number(e.target.dataset.hallazgo)].descartado = !e.target.checked;
+      const etq = e.target.closest('.hallazgos').querySelector('.etq-lim');
+      etq.textContent = `Hallazgos cuantitativos (${p.hallazgos.filter((h) => !h.descartado).length} de ${p.hallazgos.length})`;
+      ctx.cambiado();
+    } else if (e.target.matches('[data-adjuntar]') && e.target.files[0]) {
+      const archivo = e.target.files[0];
+      informar(`Leyendo ${archivo.name}…`);
+      try {
+        const { info, datos } = await contenidoPdf(archivo);
+        incorporarPdf(p, datos);
+        if (!p.doi && info.doi) {
+          p.doi = info.doi;
+          verificar(p);
+        }
+        ctx.cambiado();
+        refrescarTarjeta(p.id);
+        informarPdf(archivo.name, info);
+      } catch (err) {
+        informar(`No se pudo leer ${archivo.name}: ${err.message}`, 'error');
+      }
+    }
   });
 
   matriz.addEventListener('click', (e) => {
@@ -562,7 +708,8 @@ export function montarEstadoArte(contenedor, ctx) {
     const p = btn && paperDe(btn);
     if (!p) return;
     if (btn.dataset.sugerencia !== undefined) {
-      const frase = p.sugerencias[Number(btn.dataset.sugerencia)];
+      const s = comoFrase(p.sugerencias[Number(btn.dataset.sugerencia)]);
+      const frase = s.pagina ? `${s.texto} (p. ${s.pagina})` : s.texto;
       const ta = btn.closest('.limitaciones').querySelector('textarea');
       ta.value = ta.value.trim() ? `${ta.value.trim()}\n${frase}` : frase;
       ta.dispatchEvent(new Event('input', { bubbles: true }));
