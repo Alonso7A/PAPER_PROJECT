@@ -1,0 +1,27 @@
+{
+  "fuente": "docs/paper-cientifico-ingenieria.md — FASE 1 (verbo rector según el nivel) y FASE 5.3 (verbos prohibidos)",
+  "verbos": {
+    "explorar":     { "niveles": ["exploratorio"], "nominal": "exploración" },
+    "sondear":      { "niveles": ["exploratorio"], "nominal": "sondeo" },
+    "identificar":  { "niveles": ["exploratorio"], "nominal": "identificación" },
+    "describir":    { "niveles": ["descriptivo"], "nominal": "descripción" },
+    "caracterizar": { "niveles": ["descriptivo"], "nominal": "caracterización" },
+    "analizar":     { "niveles": ["correlacional", "explicativo"], "nominal": "análisis",
+                      "nota": "“Analizar” es ambiguo: se usa en estudios correlacionales y explicativos. Si manipulas la variable independiente, prefiere “evaluar” o “determinar”." },
+    "relacionar":   { "niveles": ["correlacional"], "nominal": "relación" },
+    "asociar":      { "niveles": ["correlacional"], "nominal": "asociación" },
+    "evaluar":      { "niveles": ["explicativo"], "nominal": "evaluación" },
+    "determinar":   { "niveles": ["explicativo"], "nominal": "determinación" },
+    "explicar":     { "niveles": ["explicativo"], "nominal": "explicación" },
+    "predecir":     { "niveles": ["predictivo"], "nominal": "predicción" },
+    "estimar":      { "niveles": ["predictivo"], "nominal": "estimación" },
+    "modelar":      { "niveles": ["predictivo"], "nominal": "modelado" },
+    "optimizar":    { "niveles": ["predictivo", "explicativo"], "nominal": "optimización",
+                      "nota": "Un problema de optimización corresponde a investigación aplicada de nivel explicativo o predictivo, no aplicativo. Si lo que harás es construir el sistema optimizado, el verbo correcto es “diseñar” o “implementar”." },
+    "diseñar":      { "niveles": ["aplicativo"], "nominal": "diseño" },
+    "implementar":  { "niveles": ["aplicativo"], "nominal": "implementación" },
+    "desarrollar":  { "niveles": ["aplicativo"], "nominal": "desarrollo" }
+  },
+  "nominalesRevista": ["efecto", "influencia", "impacto"],
+  "verbosProhibidos": ["conocer", "entender", "comprender", "aprender", "profundizar", "concientizar", "saber"]
+}

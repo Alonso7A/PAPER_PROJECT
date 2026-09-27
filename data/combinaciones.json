@@ -1,0 +1,57 @@
+{
+  "fuente": "Casquero Zaidman (2026), Arquitectura metodológica de la investigación en la ingeniería — sección 2.6, matriz filtrada de 30 combinaciones válidas",
+  "criterios": {
+    "enfoque": { "label": "Enfoque", "opciones": {
+      "cuantitativo": "Cuantitativo", "cualitativo": "Cualitativo", "mixto": "Mixto" } },
+    "tipo": { "label": "Tipo", "opciones": {
+      "basica": "Básica", "aplicada": "Aplicada", "tecnologica": "Tecnológica" } },
+    "nivel": { "label": "Nivel", "opciones": {
+      "exploratorio": "Exploratorio", "descriptivo": "Descriptivo", "correlacional": "Correlacional",
+      "explicativo": "Explicativo", "predictivo": "Predictivo", "aplicativo": "Aplicativo" } },
+    "diseno": { "label": "Diseño", "opciones": {
+      "experimental": "Experimental", "cuasi_experimental": "Cuasi experimental", "no_experimental": "No experimental" } },
+    "temporalidad": { "label": "Temporalidad", "opciones": {
+      "transversal": "Transversal", "longitudinal": "Longitudinal", "prospectivo": "Prospectivo", "retrospectivo": "Retrospectivo" } },
+    "unidad": { "label": "Unidad de análisis", "opciones": {
+      "sistema": "Sistema", "individuos": "Individuos", "grupo": "Grupo", "institucion": "Institución", "documentos": "Documentos" } }
+  },
+  "nivelDiseno": {
+    "exploratorio": ["no_experimental"],
+    "descriptivo": ["no_experimental"],
+    "correlacional": ["no_experimental", "cuasi_experimental"],
+    "explicativo": ["experimental", "cuasi_experimental"]
+  },
+  "orden": ["enfoque", "tipo", "nivel", "diseno", "temporalidad", "unidad"],
+  "validas": [
+    { "n": 1,  "c": ["cuantitativo", "aplicada",    "descriptivo",   "no_experimental",    "transversal",   "sistema"] },
+    { "n": 2,  "c": ["cuantitativo", "aplicada",    "correlacional", "no_experimental",    "transversal",   "sistema"] },
+    { "n": 3,  "c": ["cuantitativo", "aplicada",    "explicativo",   "cuasi_experimental", "longitudinal",  "sistema"] },
+    { "n": 4,  "c": ["cuantitativo", "aplicada",    "predictivo",    "no_experimental",    "longitudinal",  "sistema"] },
+    { "n": 5,  "c": ["cuantitativo", "tecnologica", "aplicativo",    "cuasi_experimental", "longitudinal",  "sistema"] },
+    { "n": 6,  "c": ["cuantitativo", "tecnologica", "explicativo",   "cuasi_experimental", "prospectivo",   "sistema"] },
+    { "n": 7,  "c": ["cuantitativo", "tecnologica", "predictivo",    "no_experimental",    "prospectivo",   "sistema"] },
+    { "n": 8,  "c": ["cuantitativo", "aplicada",    "explicativo",   "experimental",       "longitudinal",  "sistema"] },
+    { "n": 9,  "c": ["cuantitativo", "aplicada",    "correlacional", "no_experimental",    "longitudinal",  "sistema"] },
+    { "n": 10, "c": ["cuantitativo", "aplicada",    "descriptivo",   "no_experimental",    "retrospectivo", "sistema"] },
+    { "n": 11, "c": ["cuantitativo", "tecnologica", "aplicativo",    "experimental",       "prospectivo",   "sistema"] },
+    { "n": 12, "c": ["mixto",        "aplicada",    "descriptivo",   "no_experimental",    "transversal",   "sistema"] },
+    { "n": 13, "c": ["mixto",        "aplicada",    "correlacional", "no_experimental",    "transversal",   "sistema"] },
+    { "n": 14, "c": ["mixto",        "aplicada",    "explicativo",   "cuasi_experimental", "longitudinal",  "sistema"] },
+    { "n": 15, "c": ["mixto",        "tecnologica", "aplicativo",    "cuasi_experimental", "longitudinal",  "sistema"] },
+    { "n": 16, "c": ["cuantitativo", "aplicada",    "explicativo",   "cuasi_experimental", "longitudinal",  "grupo"] },
+    { "n": 17, "c": ["cuantitativo", "aplicada",    "correlacional", "no_experimental",    "transversal",   "grupo"] },
+    { "n": 18, "c": ["cuantitativo", "aplicada",    "descriptivo",   "no_experimental",    "transversal",   "institucion"] },
+    { "n": 19, "c": ["cuantitativo", "aplicada",    "explicativo",   "cuasi_experimental", "longitudinal",  "institucion"] },
+    { "n": 20, "c": ["cuantitativo", "tecnologica", "aplicativo",    "cuasi_experimental", "prospectivo",   "institucion"] },
+    { "n": 21, "c": ["mixto",        "aplicada",    "descriptivo",   "no_experimental",    "transversal",   "institucion"] },
+    { "n": 22, "c": ["mixto",        "aplicada",    "correlacional", "no_experimental",    "transversal",   "institucion"] },
+    { "n": 23, "c": ["cuantitativo", "aplicada",    "predictivo",    "no_experimental",    "longitudinal",  "sistema"] },
+    { "n": 24, "c": ["cuantitativo", "tecnologica", "explicativo",   "cuasi_experimental", "longitudinal",  "sistema"] },
+    { "n": 25, "c": ["cuantitativo", "tecnologica", "predictivo",    "no_experimental",    "longitudinal",  "sistema"] },
+    { "n": 26, "c": ["cuantitativo", "aplicada",    "aplicativo",    "cuasi_experimental", "longitudinal",  "sistema"] },
+    { "n": 27, "c": ["cuantitativo", "tecnologica", "aplicativo",    "cuasi_experimental", "longitudinal",  "sistema"] },
+    { "n": 28, "c": ["mixto",        "tecnologica", "aplicativo",    "cuasi_experimental", "prospectivo",   "sistema"] },
+    { "n": 29, "c": ["cuantitativo", "aplicada",    "explicativo",   "experimental",       "prospectivo",   "sistema"] },
+    { "n": 30, "c": ["cuantitativo", "tecnologica", "explicativo",   "experimental",       "longitudinal",  "sistema"] }
+  ]
+}

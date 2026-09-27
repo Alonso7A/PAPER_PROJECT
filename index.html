@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Creador de Papers</title>
+  <meta name="description" content="Guía interactiva para construir un paper científico de ingeniería desde cero: valida título, tipificación, estado del arte y cadena lógica, y genera el protocolo.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='3' width='20' height='26' rx='3' fill='%2300629B'/%3E%3Cpath d='M11 11h10M11 16h10M11 21h6' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/styles.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
+
+  <header class="barra">
+    <button type="button" class="btn-menu" id="btn-menu" aria-controls="lateral" aria-expanded="false" aria-label="Mostrar recuadros">☰</button>
+    <div class="marca">
+      <span class="logo" aria-hidden="true"></span>
+      <div>
+        <h1>Creador de Papers</h1>
+        <p>Ingeniería · de la idea al protocolo</p>
+      </div>
+    </div>
+    <div class="progreso" aria-live="polite">
+      <span id="progreso-texto">Cargando…</span>
+      <span class="progreso-pista"><span class="progreso-barra" id="progreso-barra"></span></span>
+    </div>
+    <span class="guardado" id="guardado" aria-live="polite"></span>
+  </header>
+
+  <div class="app">
+    <nav class="lateral" id="lateral" aria-label="Recuadros">
+      <ol id="lista-secciones"></ol>
+      <div class="acciones">
+        <button type="button" class="sec" id="btn-exportar">Exportar proyecto (JSON)</button>
+        <button type="button" class="sec" id="btn-importar">Importar proyecto</button>
+        <input type="file" id="archivo-importar" accept=".json,application/json" hidden>
+        <button type="button" class="peligro" id="btn-reiniciar">Reiniciar</button>
+        <p class="nota">Tu avance se guarda solo en este navegador. Exporta el JSON para llevarlo a otro equipo.</p>
+      </div>
+    </nav>
+
+    <main id="contenido" tabindex="-1">
+      <p class="cargando">Cargando…</p>
+    </main>
+  </div>
+
+  <div class="vista-informe" id="vista-informe" hidden>
+    <div class="informe-barra">
+      <strong>Informe</strong>
+      <div>
+        <button type="button" id="inf-md">Descargar .md</button>
+        <button type="button" class="sec" id="inf-pdf">Imprimir / Guardar PDF</button>
+        <button type="button" class="sec" id="inf-cerrar">Cerrar</button>
+      </div>
+    </div>
+    <article class="informe-doc" id="informe-doc"></article>
+  </div>
+
+  <noscript><p class="error-carga">Esta página necesita JavaScript.</p></noscript>
+</body>
+</html>
